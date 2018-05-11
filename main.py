@@ -11,30 +11,74 @@ PREV_AREA = []
 #=============
 def main(vide_source = "pupil.mkv"):
     cap = cv2.VideoCapture(vide_source)
-    pupil_hist = []
+    centroids = np.empty((0,2), float)
 
     while True:
         ret, frame = cap.read()
+        h = frame.shape[1]
         if ret:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            find_pupil(gray)
-            # painted = remove_glare(gray)
-            # hist = cv2.calcHist([painted], [0], None, [256], [0,256])
-            # cut  = find_pupil(hist, pupil_hist)
-            # print(cut)
-            # if len(pupil_hist) > 5:
-            #     pupil_hist.pop(0)
-            # blob = get_blob(painted, cut)
-            color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-            # ellipse = find_ellipse(blob)
-            # if ellipse is not None:
-            #     cv2.ellipse(color, ellipse, (0,255,0), 2)
-            cv2.imshow("test", color)
-        if cv2.waitKey(0) & 0xFF == ord('q'):
-            break
+            confidence, ellipse = find_pupil(gray)
+            if confidence > 0.85:
+                cv2.ellipse(frame, ellipse, (0,255,0), 2)
+                centroids = np.vstack((centroids, ellipse[0]))
+            cv2.imshow("test", frame)
+        if cv2.waitKey(0) & 0xFF == ord('s'):
+            mean = np.mean(centroids, axis=0)
+            centers = centroids - mean
+            polar = to_polar(centers)
+            extremes = find_extremes(polar)
+            cartesian = to_cartesian(extremes) + mean
+            cnt = [np.array(cartesian, np.int32)]
+            ring = cv2.fitEllipseDirect(cnt[0])
+            if ring is not None:
+                cv2.ellipse(frame, ring, (0,0,255), 5)
+                cv2.imshow('testinho', frame)
+
+            # plt.scatter(cartesian[:,0], cartesian[:,1])
+            # plt.scatter(0, 0, c='r')
+            # plt.show()
+        # if cv2.waitKey(0) & 0xFF == ord('q'):
+        #     # plt.scatter(centroids[:,0], centroids[:,1])
+        #     # mean = np.mean(centroids, axis=0)
+        #     # plt.scatter(mean[0], mean[1], c='r')
+        #     # plt.show()
+        #     break
 
     cap.release()
     cv2.destroyAllWindows()
+
+# find extreme points
+#====================
+def find_extremes(polar):
+    ordered  = polar[polar[:,1].argsort()]
+    step     = len(ordered)//12
+    extremes = np.empty((0,2))
+    for i in range(0, len(ordered), step):
+        searchable = np.empty((0,2))
+        for j in range(i, i+step):
+            if j == len(ordered):
+                break
+            searchable = np.vstack((searchable, ordered[j]))
+        extremes = np.vstack((extremes, np.max(searchable, axis=0)))
+    return extremes
+
+# transform to polar coordinates
+#===============================
+def to_polar(vec):
+    rho = np.sqrt(vec[:,0]**2 + vec[:,1]**2).reshape((-1,1))
+    phi = np.arctan2(vec[:,1], vec[:,0]).reshape((-1,1))
+    coord = np.hstack((rho, phi))
+    return coord
+
+
+# transform to cartesian coords
+#==============================
+def to_cartesian(vec):
+    x = (vec[:,0] * np.cos(vec[:,1])).reshape((-1,1))
+    y = (vec[:,0] * np.sin(vec[:,1])).reshape((-1,1))
+    coord = np.hstack((x,y))
+    return coord
 
 
 # remove bright spots
@@ -59,7 +103,7 @@ def find_pupil(img):
         cnt_e, ellipse = get_ellipse(cnt, img)
         confidence = get_confidence(cnt, cnt_e)
         return confidence, ellipse
-    return None, None
+    return 0, None
 
 
 #get the biggest continuous blob
