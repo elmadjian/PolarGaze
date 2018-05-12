@@ -9,8 +9,8 @@ PREV_AREA = []
 
 # main program
 #=============
-def main(vide_source = "pupil.mkv"):
-    cap = cv2.VideoCapture(vide_source)
+def main(video_source = "pupil.mkv"):
+    cap = cv2.VideoCapture(video_source)
     centroids = np.empty((0,2), float)
     ratios    = np.empty((0,1), float)
 
@@ -31,6 +31,7 @@ def main(vide_source = "pupil.mkv"):
             polar = to_polar(centers)
             polar2 = polar * ratios
             polar2[:,1] = polar[:,1]
+
 
             cart = to_cartesian(polar)
             cart2 = to_cartesian(polar2)
