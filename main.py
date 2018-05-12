@@ -12,21 +12,29 @@ PREV_AREA = []
 def main(vide_source = "pupil.mkv"):
     cap = cv2.VideoCapture(vide_source)
     centroids = np.empty((0,2), float)
+    ratios    = np.empty((0,1), float)
 
     while True:
         ret, frame = cap.read()
-        h = frame.shape[1]
         if ret:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             confidence, ellipse = find_pupil(gray)
             if confidence > 0.85:
                 cv2.ellipse(frame, ellipse, (0,255,0), 2)
+                ratio = ellipse[1][1]/ellipse[1][0]
                 centroids = np.vstack((centroids, ellipse[0]))
+                ratios = np.vstack((ratios, ratio))
             cv2.imshow("test", frame)
         if cv2.waitKey(0) & 0xFF == ord('s'):
             mean = np.mean(centroids, axis=0)
             centers = centroids - mean
             polar = to_polar(centers)
+            polar2 = polar * ratios
+            polar2[:,1] = polar[:,1]
+
+            cart = to_cartesian(polar)
+            cart2 = to_cartesian(polar2)
+
             extremes = find_extremes(polar)
             cartesian = to_cartesian(extremes) + mean
             cnt = [np.array(cartesian, np.int32)]
@@ -35,9 +43,10 @@ def main(vide_source = "pupil.mkv"):
                 cv2.ellipse(frame, ring, (0,0,255), 5)
                 cv2.imshow('testinho', frame)
 
-            # plt.scatter(cartesian[:,0], cartesian[:,1])
-            # plt.scatter(0, 0, c='r')
-            # plt.show()
+            plt.scatter(cart[:,0], cart[:,1])
+            plt.scatter(cart2[:,0], cart2[:,1], c='g')
+            plt.scatter(0, 0, c='r')
+            plt.show()
         # if cv2.waitKey(0) & 0xFF == ord('q'):
         #     # plt.scatter(centroids[:,0], centroids[:,1])
         #     # mean = np.mean(centroids, axis=0)
