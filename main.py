@@ -1,7 +1,8 @@
 import cv2
 import sys
 import numpy as np
-import queue
+import tracker
+import polar
 from matplotlib import pyplot as plt
 
 
@@ -182,31 +183,23 @@ def get_confidence(contour, ellipse):
 
 if __name__=="__main__":
     if len(sys.argv) > 1:
-        main(sys.argv[1])
+        tracker = tracker.Tracker()
+        pupil_action = polar.Polar()
+        cap = cv2.VideoCapture(sys.argv[1])
+        ring = None
+        while True:
+            ret, frame = cap.read()
+            if ret:
+                ellipse = tracker.find_pupil(frame)
+                if ellipse is not None:
+                    cv2.ellipse(frame, ellipse, (0,255,0), 2)
+                if len(tracker.centroids) % 100 == 0:
+                    ring = pupil_action.update_model(tracker.centroids)
+                if ring is not None:
+                    cv2.ellipse(frame, ring, (0,0,255), 2)
+                cv2.imshow('test', frame)
+            if cv2.waitKey(0) & 0xFF == ord('q'):
+                break
     else:
         main()
 
-
-
-
-# def __grow_area(seed, img):
-#     q = queue.Queue()
-#     mask = np.zeros(img.shape, np.uint8)
-#     pinv = (seed[1], seed[0])
-#     mask[pinv] = 255
-#     q.put(pinv)
-#     while not q.empty():
-#         p = q.get()
-#         p1 = (p[0]-1, p[1])
-#         p2 = (p[0]+1, p[1])
-#         p3 = (p[0], p[1]+1)
-#         p4 = (p[0], p[1]-1)
-#         plist = [p1,p2,p3,p4]
-#         for el in plist:
-#             if (abs(img[p] - img[el]) < 40):
-#                 if img[el] != 255 and mask[el] != 255:
-#                     mask[el] = 255
-#                     q.put(el)
-#         cv2.imshow('testinho', mask)
-#         cv2.imshow('testinho2', img)
-#         cv2.waitKey(0)
