@@ -3,7 +3,7 @@ import cv2
 
 class Tracker():
 
-    def __init__(self, confidence=0.85, cutout=1000):
+    def __init__(self, confidence=0.85, cutout=600):
         self.centroids = np.empty((0,2), float)
         self.conf      = confidence
         self.cutout    = cutout
@@ -20,12 +20,13 @@ class Tracker():
         minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(blur)
         ret, thresh = cv2.threshold(img, minVal+15, 255, cv2.THRESH_BINARY_INV)
         blob = self.__get_blob(thresh)
-        cnt = self.__get_contours(blob) 
+        cnt = self.__get_contours(blob)
         cnt_e, ellipse = self.__get_ellipse(cnt, img)
-        confidence = self.__get_confidence(cnt, cnt_e)
-        if confidence > self.conf:
-            self.__update_centroids(ellipse)
-            return ellipse
+        if cnt_e is not None:
+            confidence = self.__get_confidence(cnt, cnt_e)
+            if confidence > self.conf and confidence <= 1.0:
+                self.update_centroids(ellipse[0])
+                return ellipse
 
 
     def __get_blob(self, bin_img):
@@ -33,12 +34,16 @@ class Tracker():
         IN: thresholded image with pupil as foreground
         OUT: blob area containing only de pupil (hopefully)
         '''
-        #TODO: return more than one blob that is the area range of 1000~12000
+        #TODO: return more than one blob
         ret, labels, stats, centroids = cv2.connectedComponentsWithStats(bin_img)
         blob = np.zeros(bin_img.shape, np.uint8)
         stats = stats[1:]
+        max_area, idx = 0, 0
         if len(stats) > 0:
-            idx = np.argmax(stats[:,4]) + 1
+            for i in range(len(stats)):
+                if stats[i,4] > max_area and 1500 < stats[i,4] < 10500:
+                    max_area = stats[i,4]
+                    idx = i + 1
             blob[labels==idx] = 255
             return blob
 
@@ -73,6 +78,7 @@ class Tracker():
             cim, cnt, hiq = cv2.findContours(mask, cv2.RETR_EXTERNAL, 
                                             cv2.CHAIN_APPROX_NONE)
             return cnt, ellipse
+        return None, None
 
     
     def __get_confidence(self, blob_contour, ellipse_contour):
@@ -88,14 +94,14 @@ class Tracker():
         return blob_area/ellipse_area
 
     
-    def __update_centroids(self, ellipse):
+    def update_centroids(self, centroid):
         '''
         Manages the amount of centroids that have been
         calculated from detected ellipses so far
         IN: current detected ellipse
         OUT: None
         '''
-        self.centroids = np.vstack((self.centroids, ellipse[0]))
+        self.centroids = np.vstack((self.centroids, centroid))
         if len(self.centroids) > self.cutout:
-            percentile = self.cutout/20
-            self.centroids = self.centroids[:percentile, :]
+            percentile = self.cutout//10
+            self.centroids = self.centroids[percentile:, :]

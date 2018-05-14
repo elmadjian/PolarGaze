@@ -5,6 +5,7 @@ class Polar():
 
     def __init__(self):
         self.center = None
+        self.extremes = None
 
     def update_model(self, centroids):
         '''
@@ -15,8 +16,9 @@ class Polar():
         mean = np.mean(centroids, axis=0)
         ellipse_centers = centroids - mean
         polar = self.__to_polar_batch(ellipse_centers)
-        extremes = self.__find_extremes(polar, 12)
+        extremes = self.__find_extremes(polar, 18)
         cartesian = self.__to_cartesian_batch(extremes) + mean
+        self.extremes = cartesian
         cnt = [np.array(cartesian, np.int32)]
         action_area = cv2.fitEllipseDirect(cnt[0])
         if action_area is not None:
