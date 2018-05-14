@@ -11,8 +11,8 @@ from matplotlib import pyplot as plt
 
 
 if __name__=="__main__":
-    control    = controller.Control()
     calibrator = calibrator.Calibrator()
+    control    = controller.Control(calibrator)
     le_tracker = tracker.Tracker()
     re_tracker = tracker.Tracker()
     le_pupil   = polar.Polar()
@@ -35,7 +35,18 @@ if __name__=="__main__":
         if sc_ret:
             cv2.imshow('left', left_eye.get_frame(control.action))
             cv2.imshow('right', right_eye.get_frame(control.action))
-            center = detector.detect(sc_frame, code)
+            le_c = left_eye.centroid
+            re_c = right_eye.centroid
+            if control.calibration:
+                target = detector.detect(sc_frame, code)
+                calibrator.collect_data(target, le_c, re_c)
+            elif control.estimation:
+                calibrator.estimate_gaze()
+                control.estimation = False
+            elif control.calibrated:
+                coord = calibrator.predict(le_c, re_c)
+                pos = (int(coord[0]), int(coord[1]))
+                cv2.circle(sc_frame, pos, 12, (200,0,200),-1)
             cv2.imshow('scene', sc_frame)
             
         

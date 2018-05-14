@@ -5,10 +5,12 @@ from threading import Thread
 
 class Control(Thread):
 
-    def __init__(self):
+    def __init__(self, calibrator):
         Thread.__init__(self)
         self.action = False
         self.calibration = False
+        self.estimation = False
+        self.calibrated = False
 
 
     def run(self):
@@ -30,6 +32,14 @@ class Control(Thread):
                 if event.type == ecodes.EV_KEY:
                     if event.code == 46 and event.value == 1:
                         self.calibration = not self.calibration
+                        if self.calibration:
+                            print("calibrating...")
+                            self.calibrated = False
+                            self.estimation = False
+                        else:
+                            print("finishing calibration")
+                            self.estimation = True
+                            self.calibrated = True
                     if event.code == 31 and event.value == 1:
                         self.action = not self.action
                         if self.action:

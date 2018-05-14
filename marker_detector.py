@@ -16,7 +16,9 @@ class MarkerDetector():
         transformed_ones = self._transform_marker(possible_markers, img)
         ret, center      = self._get_marker_code(transformed_ones, code, img)
         if ret:
-            return center
+            norm_x = center[0]/1280
+            norm_y = center[1]/720
+            return np.array([norm_x, norm_y])
         # if ret:
         #     return self._get_vectors(corners)
         # return None, None
