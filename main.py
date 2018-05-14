@@ -3,36 +3,29 @@ import sys
 import numpy as np
 import tracker
 import polar
-import control
+import controller
 import eye
-import time
+import marker_detector
+import calibrator
 from matplotlib import pyplot as plt
 
 
-def process_eye_frame(tracker, polar, frame):
-    ellipse = tracker.find_pupil(frame)
-    if ellipse is not None:
-        cv2.ellipse(frame, ellipse, (0,255,0), 2)
-    if len(tracker.centroids) % 50 == 0:
-        ring = polar.update_model(tracker.centroids)
-        tracker.update_centroids(polar.extremes)
-        return ring
-    
-def show_action(ring, frame, side):
-    if ring is not None:
-        cv2.ellipse(frame, ring, (0,0,255), 2)
-    cv2.imshow(side, frame)
-
-
 if __name__=="__main__":
-    control    = control.Control()
+    control    = controller.Control()
+    calibrator = calibrator.Calibrator()
     le_tracker = tracker.Tracker()
     re_tracker = tracker.Tracker()
     le_pupil   = polar.Polar()
     re_pupil   = polar.Polar()
+    detector   = marker_detector.MarkerDetector()
     left_eye   = eye.Eye(le_tracker, le_pupil, 'left_eye.avi')
     right_eye  = eye.Eye(re_tracker, re_pupil, 'right_eye.avi')
     cap_scene  = cv2.VideoCapture('scene.avi')
+    code = [
+        [1,1,1],
+        [1,0,0],
+        [1,0,0]
+    ]
     control.start()
 
 
@@ -42,9 +35,11 @@ if __name__=="__main__":
         if sc_ret:
             cv2.imshow('left', left_eye.get_frame(control.action))
             cv2.imshow('right', right_eye.get_frame(control.action))
+            center = detector.detect(sc_frame, code)
             cv2.imshow('scene', sc_frame)
+            
         
-        if cv2.waitKey(2) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     control.join()
