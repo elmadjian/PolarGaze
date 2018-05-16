@@ -12,12 +12,14 @@ class Eye():
         self.centroid = None
 
 
-    def get_frame(self, detect_action):
+    def get_frame(self, side=None):
         ret, frame = self.cap.read()
         if ret:
+            if side == 'l':
+                frame = cv2.flip(frame, 0)
+            elif side == 'r':
+                frame = cv2.flip(frame, 1)
             self.__process_frame(frame)
-            if detect_action:
-                self.__process_action(frame)
             return self.__post_frame(frame)
         return False, None
             
@@ -37,15 +39,9 @@ class Eye():
                 y = ellipse[0][1]/600
                 self.centroid = np.array([x,y], float)
                 self.__draw_ellipse_axes(frame, self.ring)
-                print(self.centroid)
+                #print(self.centroid)
 
 
-    def __process_action(self, frame):
-        if len(self.tracker.centroids) % 50 == 0:
-            self.ring = self.polar.update_model(self.tracker.centroids)
-            self.tracker.update_centroids(self.polar.extremes)
-
-    
     def __post_frame(self, frame):
         if self.ring is not None:
             cv2.ellipse(frame, self.ring, (0,0,255), 2)

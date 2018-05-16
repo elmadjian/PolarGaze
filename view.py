@@ -3,14 +3,12 @@ from evdev import InputDevice, categorize, ecodes
 from threading import Thread
 
 
-class Control(Thread):
+class View(Thread):
 
-    def __init__(self, calibrator):
+    def __init__(self, controller):
         Thread.__init__(self)
-        self.action = False
         self.calibration = False
-        self.estimation = False
-        self.calibrated = False
+        self.controller = controller
 
 
     def run(self):
@@ -30,23 +28,25 @@ class Control(Thread):
         if device is not None:
             for event in device.read_loop():
                 if event.type == ecodes.EV_KEY:
-                    if event.code == 46 and event.value == 1:
+                    #print(event.code)
+                    if event.code == 46 and event.value == 1: #'c'
                         self.calibration = not self.calibration
                         if self.calibration:
                             print("calibrating...")
-                            self.calibrated = False
-                            self.estimation = False
+                            self.controller.calibrate()
                         else:
-                            print("finishing calibration")
-                            self.estimation = True
-                            self.calibrated = True
-                    if event.code == 31 and event.value == 1:
-                        self.action = not self.action
-                        if self.action:
-                            print("detecting pupil action area")
-                        else:
-                            print("ending detection")
-                    if event.code == 16 and event.value == 1:
+                            print("finished calibration")
+                            self.controller.end_calibration()
+                   
+                    if event.code == 31 and event.value == 1: #'s'
+                        print("detecting pupil action area")
+                        self.controller.build_model()
+
+                    if event.code == 19 and event.value == 1: #'r'
+                        print('resetting model')
+                        self.controller.reset_model()
+
+                    if event.code == 16 and event.value == 1: #'q'
                         print('quitting...')
                         break
         else:
