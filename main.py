@@ -33,9 +33,9 @@ if __name__=="__main__":
         sc_ret, sc_frame = cap_scene.read()
 
         if sc_ret:
-            cv2.imshow('left', left_eye.get_frame(control.action))
+            #cv2.imshow('left', left_eye.get_frame(control.action))
             cv2.imshow('right', right_eye.get_frame(control.action))
-            le_c = left_eye.centroid
+            #le_c = left_eye.centroid
             re_c = right_eye.centroid
             if control.calibration:
                 target = detector.detect(sc_frame, code)
@@ -47,10 +47,10 @@ if __name__=="__main__":
                 coord = calibrator.predict(le_c, re_c)
                 pos = (int(coord[0]), int(coord[1]))
                 cv2.circle(sc_frame, pos, 12, (200,0,200),-1)
-            cv2.imshow('scene', sc_frame)
+            #cv2.imshow('scene', sc_frame)
             
         
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(0) & 0xFF == ord('q'):
             break
 
     control.join()
