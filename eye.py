@@ -31,30 +31,13 @@ class Eye():
                 translated = np.subtract(ellipse[0], self.polar.center)
                 inverted = np.array([translated[0], -translated[1]])
                 rotated = self.polar.rotate(inverted)
-                #limit = self.polar.get_point_on_ellipse(ellipse[0])
-                lim_x, lim_y = self.polar.get_xy_edges(ellipse[0])
-                tx = lim_x - self.polar.center
-                ty = lim_y - self.polar.center
-                inv_x = np.array([tx[0], -tx[1]])
-                inv_y = np.array([ty[0], -ty[1]])
-                rot_x = self.polar.rotate(inv_x)
-                rot_y = self.polar.rotate(inv_y)
-                #edge = np.subtract(limit,self.polar.center)
-                print('point:', rotated)
-                print('tx:', rot_x)
-                print('ty:', rot_y)
-                x = rotated[0]/rot_x[0] * np.sign(rot_x[0])# * excentricity
-                y = rotated[1]/rot_y[1] * np.sign(rot_y[1])# * excentricity
+                # x = rotated[0]/self.polar.minor_axis# * excentricity
+                # y = rotated[1]/self.polar.major_axis# * excentricity
+                x = ellipse[0][0]/800
+                y = ellipse[0][1]/600
                 self.centroid = np.array([x,y], float)
                 self.__draw_ellipse_axes(frame, self.ring)
                 print(self.centroid)
-
-                #debug
-                el = (int(ellipse[0][0]), int(ellipse[0][1]))
-                cv2.circle(frame, (int(lim_x[0]), int(lim_x[1])), 5, (200,0,200), -1)
-                cv2.circle(frame, (int(lim_y[0]), int(lim_y[1])), 5, (200,0,200), -1)
-                #cv2.circle(frame, limit, 5, (200,0,200), -1)
-                cv2.circle(frame, el, 5, (200,200,0), -1)
 
 
     def __process_action(self, frame):

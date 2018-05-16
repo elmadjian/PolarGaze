@@ -2,14 +2,14 @@ import cv2
 import numpy as np
 from threading import Thread
 
-in1 = 5
-in2 = 1
-in3 = 4
+left = 4
+right = 5
+scene = 3
 
 def record():
-    cam1 = cv2.VideoCapture(in1)
-    cam2 = cv2.VideoCapture(in2)
-    cam3 = cv2.VideoCapture(in3)
+    cam1 = cv2.VideoCapture(left)
+    cam2 = cv2.VideoCapture(right)
+    cam3 = cv2.VideoCapture(scene)
 
     set_properties(cam1, 30.0, 800, 600)
     set_properties(cam2, 30.0, 800, 600)

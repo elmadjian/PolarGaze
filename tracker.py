@@ -91,7 +91,9 @@ class Tracker():
         #TODO: if there are multiple ellipses, choose the one with higher conf rate
         blob_area = cv2.contourArea(blob_contour)
         ellipse_area = cv2.contourArea(ellipse_contour[0])
-        return blob_area/ellipse_area
+        if ellipse_area > 0:
+            return blob_area/ellipse_area
+        return 0
 
     
     def update_centroids(self, centroid):
