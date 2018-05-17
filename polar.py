@@ -42,34 +42,47 @@ class Polar():
         phi = np.arctan2(vec[1], vec[0])
         return np.array([rho, phi])
 
-    
-    def get_point_on_ellipse(self, vec):
+
+    def to_elliptical_space(self, vec, normalized=False):
         translated = np.subtract(vec, self.center)
         inverted = np.array([translated[0], -translated[1]])
         rotated = self.rotate(inverted)
+        if normalized:
+            nx = rotated[0]/self.minor_axis
+            ny = rotated[1]/self.major_axis
+            return np.array([nx, ny])
+        return rotated
+
+    
+    # def distance(self, y_left_axis, vec):
+    #     factor = y_left_axis + self.major_axis
+    #     vec[1] = vec[1] + factor
+    #     return vec
+
+
+    def to_camera_space(self, vec):
+        rotated = self.rotate(vec, -self.angle)
+        inverted = np.array([rotated[0], -rotated[1]])
+        translated = inverted + self.center
+        return (int(translated[0]), int(translated[1]))
+
+    
+    def get_point_on_ellipse(self, vec):
+        rotated = self.to_elliptical_space(vec)
         polar = self.to_polar(rotated)
         sx = np.sign(np.cos(polar[1]))
         sy = np.sign(np.sin(polar[1]))
         intersect = self.__ellipse_intersect(polar)
         point = np.array([intersect[0]*sx, intersect[1]*sy])
-        rotated = self.rotate(point, -self.angle)
-        inverted = np.array([rotated[0], -rotated[1]])
-        translated = inverted + self.center
-        return (int(translated[0]), int(translated[1]))
+        return self.to_camera_space(point)
 
 
     def get_xy_edges(self, vec):
-        translated = np.subtract(vec, self.center)
-        inverted = np.array([translated[0], -translated[1]])
-        rotated = self.rotate(inverted)
+        rotated = self.to_elliptical_space(vec)
         px = self.__ellipse_intersect_x_axis(rotated)
         py = self.__ellipse_intersect_y_axis(rotated)
-        rot_px = self.rotate(px, -self.angle)
-        rot_py = self.rotate(py, -self.angle)
-        inv_px = np.array([rot_px[0], -rot_px[1]])
-        inv_py = np.array([rot_py[0], -rot_py[1]])
-        trs_px = inv_px + self.center
-        trs_py = inv_py + self.center
+        trs_px = self.to_camera_space(px)
+        trs_py = self.to_camera_space(py)
         return trs_px, trs_py
 
 

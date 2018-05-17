@@ -16,8 +16,11 @@ class View(Thread):
         '''
         Callback for keyboard
         's' KEY is used to toggle pupil action area mapping
+        'r' KEY resets the pupil action model
         'c' KEY is used to trigger calibration procedure
         'q' KEY is used to quit
+        'SHIFT + [1-9]' selects a calibration
+        'SHIFT + 0' disables calibration 
         '''
         device = None
         devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]

@@ -10,6 +10,8 @@ class Eye():
         self.cap = cv2.VideoCapture(feed)
         self.ring = None
         self.centroid = None
+        self.normalized = None
+        self.excentricity = 1.0
 
 
     def get_frame(self, side=None):
@@ -19,25 +21,23 @@ class Eye():
                 frame = cv2.flip(frame, 0)
             elif side == 'r':
                 frame = cv2.flip(frame, 1)
-            self.__process_frame(frame)
+            self.__process_frame(frame, side)
             return self.__post_frame(frame)
         return False, None
             
     
-    def __process_frame(self, frame):
+    def __process_frame(self, frame, side=None):
         ellipse = self.tracker.find_pupil(frame)
         if ellipse is not None:
             cv2.ellipse(frame, ellipse, (0,255,0), 2)
-            excentricity = ellipse[1][1]/ellipse[1][0]
-            #translated = np.subtract(ellipse[0], self.polar.center)
-            #inverted = np.array([translated[0], -translated[1]])
-            #rotated = self.polar.rotate(inverted)
-            # x = rotated[0]/self.polar.minor_axis# * excentricity
-            # y = rotated[1]/self.polar.major_axis# * excentricity
+            self.excentricity = ellipse[1][1]/ellipse[1][0]
             x = ellipse[0][0]/800
             y = ellipse[0][1]/600
             self.centroid = np.array([x,y], float)
-            if self.ring is not None:            
+            if self.ring is not None: 
+                #self.normalized = self.polar.to_elliptical_space(ellipse[0], False)
+                self.normalized = self.polar.to_elliptical_space(ellipse[0], True)
+                self.centroid = self.normalized
                 self.__draw_ellipse_axes(frame, self.ring)
 
 

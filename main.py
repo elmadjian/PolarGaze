@@ -7,6 +7,7 @@ import view
 import eye
 import marker_detector
 import calibrator
+import depth
 import time
 from matplotlib import pyplot as plt
 
@@ -21,6 +22,7 @@ class Controller():
         self.polar_re = polar.Polar()
         self.le_track = tracker.Tracker()
         self.re_track = tracker.Tracker()
+        self.d_estimator  = depth.DepthEstimator()
         self.calibrations = {i:None for i in range(1,10)}
         self.calibrating  = False
         self.active   = False
@@ -65,6 +67,7 @@ class Controller():
     def end_calibration(self):
         id = self.calibrating
         self.calibrations[id].estimate_gaze()
+        self.d_estimator.estimate_depth()
         self.calibrating = False
 
     
@@ -81,7 +84,9 @@ class Controller():
     def __collect_data(self, frame, code, detector, leye, reye):
         id = self.calibrating
         target = detector.detect(frame, code)
-        self.calibrations[id].collect_data(target, leye, reye)
+        if target is not None:
+            self.calibrations[id].collect_data(target, leye, reye)
+            self.d_estimator.collect_data(target, leye, reye, id)
 
 
 
@@ -105,10 +110,26 @@ class Controller():
                 cv2.imshow('right', self.right_e.get_frame('r'))
                 le_c = self.left_e.centroid
                 re_c = self.right_e.centroid
+                #print('l:', self.left_e.excentricity)
+                #print('r:', self.right_e.excentricity)
+                #print('L:', self.left_e.normalized, "R:", self.right_e.normalized)
+
+                # if self.left_e.ring is not None and self.right_e.ring is not None and self.left_e.normalized is not None:
+                #     le_c = self.left_e.normalized * self.left_e.excentricity
+                #     re_c = self.right_e.normalized * self.right_e.excentricity
+                #     factor = self.polar_le.major_axis + self.polar_re.major_axis*2
+                #     re_c[1] = re_c[1] + factor/2
+                #     le_n = np.array([le_c[0]/self.polar_le.minor_axis, le_c[1]/factor])
+                #     re_n = np.array([re_c[0]/self.polar_le.minor_axis, re_c[1]/factor])
+                #     d = np.sqrt((re_n[0]-le_n[0])**2 + (re_n[1]-le_n[1])**2)
+                #     print('D:', d)
+
                 if self.calibrating:
                     self.__collect_data(sc_frame, code, detector, le_c, re_c)
                 elif self.active:
                     coord = self.calibrations[self.active].predict(le_c, re_c)
+                    plane_id = self.d_estimator.predict(le_c, re_c)
+                    print(plane_id)
                     if coord is not None:
                         pos = (int(coord[0]), int(coord[1]))
                         cv2.circle(sc_frame, pos, 12, (200,0,200),-1)
