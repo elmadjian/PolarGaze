@@ -21,9 +21,9 @@ class Controller():
         self.polar_re = polar.Polar()
         self.le_track = tracker.Tracker()
         self.re_track = tracker.Tracker()
-        self.calib    = calibrator.Calibrator()
-        self.calibrating = False
-        self.calibrated  = False
+        self.calibrations = {i:None for i in range(1,10)}
+        self.calibrating  = False
+        self.active   = False
         self.__setup_video_input(argv)
         self.left_e   = eye.Eye(self.le_track, self.polar_le, self.le_video)
         self.right_e  = eye.Eye(self.re_track, self.polar_re, self.re_video)
@@ -56,22 +56,41 @@ class Controller():
         self.re_track.centroids = np.empty((0,2), float)
 
 
-    def calibrate(self):
-        self.calibrating = True
-        self.calibrated = False
+    def calibrate(self, id):
+        self.calibrating = id
+        calibration = calibrator.Calibrator()
+        self.calibrations[id] = calibration
 
 
     def end_calibration(self):
-        #TODO: add multiple calibrations here
-        self.calib.estimate_gaze()
+        id = self.calibrating
+        self.calibrations[id].estimate_gaze()
         self.calibrating = False
-        self.calibrated = True
+
+    
+    def use_calibration(self, id):
+        if id in self.calibrations.keys():
+            if self.calibrations[id] is not None:
+                self.active = id
+            else:
+                print('No calibration has been found for id:', id)
+        else:
+            self.active = False
+
+
+    def __collect_data(self, frame, code, detector, leye, reye):
+        id = self.calibrating
+        target = detector.detect(frame, code)
+        self.calibrations[id].collect_data(target, leye, reye)
+
 
 
     def run(self):
         kbd       = view.View(self)
         detector  = marker_detector.MarkerDetector()
         cap_scene = cv2.VideoCapture(self.sc_video)
+        cap_scene.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap_scene.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         code = [
             [1,1,1],
             [1,0,0],
@@ -87,10 +106,9 @@ class Controller():
                 le_c = self.left_e.centroid
                 re_c = self.right_e.centroid
                 if self.calibrating:
-                    target = detector.detect(sc_frame, code)
-                    self.calib.collect_data(target, le_c, re_c)
-                elif self.calibrated:
-                    coord = self.calib.predict(le_c, re_c)
+                    self.__collect_data(sc_frame, code, detector, le_c, re_c)
+                elif self.active:
+                    coord = self.calibrations[self.active].predict(le_c, re_c)
                     if coord is not None:
                         pos = (int(coord[0]), int(coord[1]))
                         cv2.circle(sc_frame, pos, 12, (200,0,200),-1)
