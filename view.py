@@ -5,11 +5,12 @@ from threading import Thread
 
 class View(Thread):
 
-    def __init__(self, controller):
+    def __init__(self, controller, cv):
         Thread.__init__(self)
         self.calibration = False
         self.active = False
         self.controller = controller
+        self.cv = cv
 
 
     def run(self):
@@ -50,6 +51,11 @@ class View(Thread):
                     if event.code == 19 and event.value == 1: #'r'
                         print('resetting model')
                         self.controller.reset_model()
+
+                    if event.code == 49 and event.value == 1: #'n'
+                        #print('next target...')
+                        with self.cv:
+                            self.cv.notify_all()
 
                     if event.code in calibrations and event.value == 1: #'0-9'
                         '''

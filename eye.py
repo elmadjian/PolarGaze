@@ -37,7 +37,7 @@ class Eye():
             if self.ring is not None: 
                 #self.normalized = self.polar.to_elliptical_space(ellipse[0], False)
                 self.normalized = self.polar.to_elliptical_space(ellipse[0], True)
-                self.centroid = self.normalized
+                #self.centroid = self.normalized
                 self.__draw_ellipse_axes(frame, self.ring)
 
 

@@ -5,25 +5,29 @@ from sklearn.gaussian_process import kernels
 
 class Calibrator():
 
-    def __init__(self):
+    def __init__(self, width, height, binocular=True):
         self.calib_point = np.array((0,0), float)
         self.targets = np.empty((0,2), float)
-        self.le_centers = np.empty((0,2), float)
-        self.re_centers = np.empty((0,2), float)
-        self.countdown = 7
+        self.l_centers = np.empty((0,2), float)
+        self.r_centers = np.empty((0,2), float)
+        self.countdown = 9
         self.regressor = None
+        self.width = width
+        self.height = height
+        self.binocular = binocular
 
 
-    def collect_data(self, target, leye, reye):
+    def collect_data(self, target, leye, reye=None):
         diff = np.abs(np.subtract(self.calib_point, target))
         if np.sum(diff) > 0.09:
             self.calib_point = target
-            self.countdown = 7
+            self.countdown = 9
         self.countdown -= 1
         if self.countdown <= 0:
             self.targets = np.vstack((self.targets, target))
-            self.le_centers = np.vstack((self.le_centers, leye))
-            self.re_centers = np.vstack((self.re_centers, reye))
+            self.l_centers = np.vstack((self.l_centers, leye))
+            if reye is not None:
+                self.r_centers = np.vstack((self.r_centers, reye))
 
 
     def estimate_gaze(self):
@@ -32,18 +36,23 @@ class Calibrator():
                                        optimizer=None,
                                        n_restarts_optimizer=9,
                                        kernel = kernel)
-        input_data = np.hstack((self.le_centers, self.re_centers))
-        clf.fit(input_data, self.targets)
+        if self.binocular:
+            input_data = np.hstack((self.l_centers, self.r_centers))
+            clf.fit(input_data, self.targets)
+        else:
+            clf.fit(self.l_centers, self.targets)
         self.regressor = clf
 
 
-    def predict(self, leye, reye):
+    def predict(self, leye, reye=None):
         if self.regressor is not None:
-            input_data = np.hstack((leye, reye)).reshape(1,-1)
+            input_data = leye.reshape(1,-1)
+            if reye is not None:
+                input_data = np.hstack((leye, reye))
             coord = self.regressor.predict(input_data)[0]
-            x = coord[0] * 1280
-            y = coord[1] * 720
-            return np.array([x,y])
+            x = coord[0] * self.width
+            y = coord[1] * self.height
+            return (int(x), int(y))
 
         
 

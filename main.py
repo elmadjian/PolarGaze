@@ -9,6 +9,8 @@ import marker_detector
 import calibrator
 import depth
 import time
+import calib_screen
+import threading
 from matplotlib import pyplot as plt
 
 
@@ -23,12 +25,15 @@ class Controller():
         self.le_track = tracker.Tracker()
         self.re_track = tracker.Tracker()
         self.d_estimator  = depth.DepthEstimator()
-        self.calibrations = {i:None for i in range(1,10)}
+        self.calibrations = {i:[None,None] for i in range(1,10)}
         self.calibrating  = False
         self.active   = False
         self.__setup_video_input(argv)
         self.left_e   = eye.Eye(self.le_track, self.polar_le, self.le_video)
         self.right_e  = eye.Eye(self.re_track, self.polar_re, self.re_video)
+        self.marker = cv2.imread('marker2.png', cv2.IMREAD_GRAYSCALE)
+        self.screen = None
+        self.cv = threading.Condition()
 
 
     def __setup_video_input(self, argv):
@@ -60,20 +65,27 @@ class Controller():
 
     def calibrate(self, id):
         self.calibrating = id
-        calibration = calibrator.Calibrator()
-        self.calibrations[id] = calibration
+        calib_left  = calibrator.Calibrator(1280,720,binocular=False)
+        calib_right = calibrator.Calibrator(1280,720,binocular=False) 
+        self.calibrations[id][0] = calib_left
+        self.calibrations[id][1] = calib_right
+        self.screen = calib_screen.CalibrationScreen(1920,1080,3,4,
+                                            self.marker, self.cv)
+        self.screen.start()
 
 
     def end_calibration(self):
         id = self.calibrating
-        self.calibrations[id].estimate_gaze()
-        self.d_estimator.estimate_depth()
+        self.calibrations[id][0].estimate_gaze()
+        self.calibrations[id][1].estimate_gaze()
+        #self.d_estimator.estimate_depth()
         self.calibrating = False
+        self.screen.join()
 
     
     def use_calibration(self, id):
         if id in self.calibrations.keys():
-            if self.calibrations[id] is not None:
+            if self.calibrations[id][0] is not None:
                 self.active = id
             else:
                 print('No calibration has been found for id:', id)
@@ -85,13 +97,14 @@ class Controller():
         id = self.calibrating
         target = detector.detect(frame, code)
         if target is not None:
-            self.calibrations[id].collect_data(target, leye, reye)
-            self.d_estimator.collect_data(target, leye, reye, id)
+            self.calibrations[id][0].collect_data(target, leye)
+            self.calibrations[id][1].collect_data(target, reye)
+            #self.d_estimator.collect_data(target, leye, reye, id)
 
 
 
     def run(self):
-        kbd       = view.View(self)
+        kbd       = view.View(self, self.cv)
         detector  = marker_detector.MarkerDetector()
         cap_scene = cv2.VideoCapture(self.sc_video)
         cap_scene.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -127,12 +140,13 @@ class Controller():
                 if self.calibrating:
                     self.__collect_data(sc_frame, code, detector, le_c, re_c)
                 elif self.active:
-                    coord = self.calibrations[self.active].predict(le_c, re_c)
-                    plane_id = self.d_estimator.predict(le_c, re_c)
-                    print(plane_id)
-                    if coord is not None:
-                        pos = (int(coord[0]), int(coord[1]))
-                        cv2.circle(sc_frame, pos, 12, (200,0,200),-1)
+                    lcoord = self.calibrations[self.active][0].predict(le_c)
+                    rcoord = self.calibrations[self.active][1].predict(re_c)
+                    #plane_id = self.d_estimator.predict(le_c, re_c)
+                    #print(plane_id)
+                    if lcoord is not None and rcoord is not None:
+                        cv2.circle(sc_frame, lcoord, 12, (200,0,200),-1)
+                        cv2.circle(sc_frame, rcoord, 12, (0,200,200),-1)
                 cv2.imshow('scene', sc_frame)
             if cv2.waitKey(5) & 0xFF == ord('q'):
                 break
