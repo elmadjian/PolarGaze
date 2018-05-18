@@ -21,12 +21,13 @@ class Tracker():
         ret, thresh = cv2.threshold(img, minVal+15, 255, cv2.THRESH_BINARY_INV)
         blob = self.__get_blob(thresh)
         cnt = self.__get_contours(blob)
-        cnt_e, ellipse = self.__get_ellipse(cnt, img)
-        if cnt_e is not None:
-            confidence = self.__get_confidence(cnt, cnt_e)
-            if confidence > self.conf and confidence <= 1.0:
-                self.update_centroids(ellipse[0])
-                return ellipse
+        if cnt is not None:
+            cnt_e, ellipse = self.__get_ellipse(cnt, img)
+            if cnt_e is not None:
+                confidence = self.__get_confidence(cnt, cnt_e)
+                if confidence > self.conf and confidence <= 1.0:
+                    self.update_centroids(ellipse[0])
+                    return ellipse
 
 
     def __get_blob(self, bin_img):
@@ -58,7 +59,8 @@ class Tracker():
         closing = cv2.morphologyEx(blob, cv2.MORPH_CLOSE, kernel)
         cim, cnt, hiq = cv2.findContours(closing, cv2.RETR_EXTERNAL,
                                         cv2.CHAIN_APPROX_NONE)
-        return cv2.convexHull(cnt[0])
+        if len(cnt) > 0:
+            return cv2.convexHull(cnt[0])
 
     
     def __get_ellipse(self, contour, img):

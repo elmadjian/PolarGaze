@@ -10,7 +10,9 @@ import calibrator
 import depth
 import time
 import calib_screen
+import realsense
 import threading
+import scene
 from matplotlib import pyplot as plt
 
 
@@ -93,10 +95,9 @@ class Controller():
             self.active = False
 
 
-    def __collect_data(self, frame, code, detector, leye, reye):
+    def __collect_data(self, target, leye, reye):
         id = self.calibrating
-        target = detector.detect(frame, code)
-        if target is not None:
+        if target is not None and leye is not None and reye is not None:
             self.calibrations[id][0].collect_data(target, leye)
             self.calibrations[id][1].collect_data(target, reye)
             #self.d_estimator.collect_data(target, leye, reye, id)
@@ -104,54 +105,35 @@ class Controller():
 
 
     def run(self):
-        kbd       = view.View(self, self.cv)
-        detector  = marker_detector.MarkerDetector()
-        cap_scene = cv2.VideoCapture(self.sc_video)
-        cap_scene.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cap_scene.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        code = [
-            [1,1,1],
-            [1,0,0],
-            [1,0,0]
-        ]
+        scn = scene.SceneCamera(self.sc_video) 
+        kbd = view.View(self, self.cv)
+        scn.start()
         kbd.start()
 
         while True:
-            sc_ret, sc_frame = cap_scene.read()
-            if sc_ret:
+            if scn.frame is not None:
                 cv2.imshow('left', self.left_e.get_frame('l'))
                 cv2.imshow('right', self.right_e.get_frame('r'))
                 le_c = self.left_e.centroid
                 re_c = self.right_e.centroid
-                #print('l:', self.left_e.excentricity)
-                #print('r:', self.right_e.excentricity)
-                #print('L:', self.left_e.normalized, "R:", self.right_e.normalized)
-
-                # if self.left_e.ring is not None and self.right_e.ring is not None and self.left_e.normalized is not None:
-                #     le_c = self.left_e.normalized * self.left_e.excentricity
-                #     re_c = self.right_e.normalized * self.right_e.excentricity
-                #     factor = self.polar_le.major_axis + self.polar_re.major_axis*2
-                #     re_c[1] = re_c[1] + factor/2
-                #     le_n = np.array([le_c[0]/self.polar_le.minor_axis, le_c[1]/factor])
-                #     re_n = np.array([re_c[0]/self.polar_le.minor_axis, re_c[1]/factor])
-                #     d = np.sqrt((re_n[0]-le_n[0])**2 + (re_n[1]-le_n[1])**2)
-                #     print('D:', d)
-
                 if self.calibrating:
-                    self.__collect_data(sc_frame, code, detector, le_c, re_c)
+                    target = scn.get_marker_position()
+                    self.__collect_data(target, le_c, re_c)
                 elif self.active:
                     lcoord = self.calibrations[self.active][0].predict(le_c)
                     rcoord = self.calibrations[self.active][1].predict(re_c)
                     #plane_id = self.d_estimator.predict(le_c, re_c)
                     #print(plane_id)
                     if lcoord is not None and rcoord is not None:
-                        cv2.circle(sc_frame, lcoord, 12, (200,0,200),-1)
-                        cv2.circle(sc_frame, rcoord, 12, (0,200,200),-1)
-                cv2.imshow('scene', sc_frame)
+                        cv2.circle(scn.frame, lcoord, 12, (200,0,200),-1)
+                        cv2.circle(scn.frame, rcoord, 12, (0,200,200),-1)
+                cv2.imshow('scene', scn.frame)
             if cv2.waitKey(5) & 0xFF == ord('q'):
+                scn.quit = True
                 break
 
         kbd.join()
+        scn.join()
         cv2.destroyAllWindows()
 
 
