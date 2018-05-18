@@ -5,15 +5,16 @@ from sklearn.gaussian_process import kernels
 
 class Calibrator():
 
-    def __init__(self, width, height, binocular=True):
+    def __init__(self, binocular=True, in3d=False):
         self.calib_point = np.array((0,0), float)
         self.targets = np.empty((0,2), float)
+        if in3d:
+            self.targets = np.empty((0,3), float)
+            self.calib_point = np.array((0,0,0), float)
         self.l_centers = np.empty((0,2), float)
         self.r_centers = np.empty((0,2), float)
         self.countdown = 9
         self.regressor = None
-        self.width = width
-        self.height = height
         self.binocular = binocular
 
 
@@ -44,14 +45,16 @@ class Calibrator():
         self.regressor = clf
 
 
-    def predict(self, leye, reye=None):
+    def predict(self, leye, reye=None, w=None, h=None):
         if self.regressor is not None:
             input_data = leye.reshape(1,-1)
             if reye is not None:
                 input_data = np.hstack((leye, reye))
             coord = self.regressor.predict(input_data)[0]
-            x = coord[0] * self.width
-            y = coord[1] * self.height
+            x = coord[0] * w
+            y = coord[1] * h
+            if len(coord) == 3:
+                return coord 
             return (int(x), int(y))
 
         

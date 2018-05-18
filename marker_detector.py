@@ -3,12 +3,14 @@ import numpy as np
 
 class MarkerDetector():
 
-    def __init__(self, calibration=None):
+    def __init__(self, width, height, calibration=None):
         self.calibration = calibration
         self.gray = None
+        self.width = width
+        self.height = height
 
 
-    def detect(self, img, code):
+    def detect(self, img, code, normalized=False):
         code = np.array(code).reshape((3,3)).astype("bool")
         preprocessed_img = self._preprocess(img)
         contour_list     = self._find_contours(preprocessed_img)
@@ -16,9 +18,11 @@ class MarkerDetector():
         transformed_ones = self._transform_marker(possible_markers, img)
         ret, center      = self._get_marker_code(transformed_ones, code, img)
         if ret:
-            norm_x = center[0]/1280
-            norm_y = center[1]/720
-            return np.array([norm_x, norm_y])
+            if normalized:
+                x = center[0]/1280
+                y = center[1]/720
+                return np.array([x,y], float)
+            return np.array([center[0], center[1]], int)
         # if ret:
         #     return self._get_vectors(corners)
         # return None, None

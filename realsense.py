@@ -1,48 +1,70 @@
 import cv2
-import numpy as np 
+import numpy as np
 import pyrealsense as pyrs 
+import marker_detector
+import time
+from threading import Thread
 
 
-class RealSense():
+class RealSense(Thread):
 
-    def __init__(self):
-        self.position = np.array([-1,-1], np.uint8)
-        self.coord3D = np.array([0,0,0], float)
-        # serv = pyrs.Service()
-        # color = pyrs.stream.ColorStream(fps=60, color_format='rgb')
-        # depth = pyrs.stream.DepthStream(fps=60)
-        # self.cam  = serv.Device(streams=(depth,))
+    def __init__(self, width, height):
+        Thread.__init__(self)
+        self.position = None
+        self.coord3D = None
+        self.color_frame = None
+        self.depth_frame = None
+        self.quit = False
+        self.detector = marker_detector.MarkerDetector(width, height)
+        self.code = [
+            [1,1,1],
+            [1,1,1],
+            [1,1,0]
+        ]
 
 
     def run(self):
+        dac   = pyrs.stream.DACStream(fps=60)
         depth = pyrs.stream.DepthStream(fps=60)
         color = pyrs.stream.ColorStream(fps=60, color_format='bgr')
         with pyrs.Service() as serv:
-            with serv.Device(streams=(depth, color)) as dev:
+            with serv.Device(streams=(depth, color, dac)) as dev:
                 dev.apply_ivcam_preset(0)
-                while True:
+                while not self.quit:
                     if dev.poll_for_frame():
-                        d = dev.depth
-                        d = self.__normalize_depth(d)
-                        c = dev.color
-                        if self.position[0] != -1 and self.position[1] != -1:
-                            p = dev.deproject_pixel_to_point(self.position, d)
-                            print(p)
-                        cv2.imshow('test', d)
-                        cv2.imshow('test2', c)
-                        if cv2.waitKey(1) & 0xFF == ord('q'):
-                            break
+                        d = dev.dac
+                        self.color_frame = dev.color
+                        if self.position is not None:
+                            self.coord3D = self.__find_3d_coord(self.position, d, dev)
+                            self.position = None
+                    time.sleep(0.005)
 
 
-    def set_target(self, target_pos):
-        self.position = target_pos
+    def set_marker_position(self):
+        if self.color_frame is not None:
+            frame = self.color_frame
+            self.position = self.detector.detect(frame, self.code)
+            if self.position is None:
+                self.coord3D = None
 
 
     def __normalize_depth(self, frame):
         M = np.mean(frame)
-        frame[frame > M] = 255
-        new_frame = (frame/M) * 255.0
+        new_frame = frame.copy()
+        new_frame[new_frame > M] = 255
+        new_frame = (new_frame/M) * 255.0
         return np.array(new_frame, np.uint8)
+
+
+    def __find_3d_coord(self, position, depth, dev):
+        x = position[1]
+        y = position[0]
+        est_depth = depth[x,y]
+        pos = np.array([y,x], np.float32)
+        if est_depth > 0:
+            return dev.deproject_pixel_to_point(pos, est_depth)
+                       
+
 
 
 
