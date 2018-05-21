@@ -4,18 +4,19 @@ import time
 from threading import Thread
 
 
-class CalibrationScreen(Thread):
+class CalibrationScreen():
 
-    def __init__(self, width, height, lines, columns, img, cv, in3d=False):
-        Thread.__init__(self)
+    def __init__(self, width, height, lines, columns, img, pipe, in3d=False):
         self.w = width
         self.h = height
         self.L = lines
         self.C = columns
         self.target = img
         self.border = 24
-        self.cv = cv
+        self.pipe = pipe
         self.in3d = in3d
+        #print('fui criado')
+        self.run()
 
     
     def run(self):
@@ -23,30 +24,26 @@ class CalibrationScreen(Thread):
         self.target = cv2.resize(self.target, (size,size))
         hgap = ((self.w - self.border)-(4*size))//5
         vgap = ((self.h - self.border)-(3*size))//5
-        window = cv2.namedWindow('calibration screen')
-        self.__cycle(hgap, vgap, size, window)
+        self.__cycle(hgap, vgap, size)
         if self.in3d:
-            self.__cycle(hgap, vgap, size, window)
-        cv2.destroyWindow(window)
+           self.__cycle(hgap, vgap, size)
 
 
-    def __cycle(self, hgap, vgap, size, window):
+    def __cycle(self, hgap, vgap, size):
         v = vgap + self.border//2
         screen = np.ones((self.h, self.w), np.uint8)*255
-        cv2.imshow(window, screen)
-        k = cv2.waitKey(0) & 0xFF == ord('n')
-        with self.cv:
-            while not k:
-                self.cv.wait()
-                k = cv2.waitKey(0) & 0xFF == ord('n') 
+        self.pipe.send(screen)
+        msg = self.pipe.recv()
         for i in range(self.L):
             h = hgap + self.border//2
             for j in range(self.C):
                 screen = np.ones((self.h, self.w), np.uint8)*255
                 screen[v:v+size,h:h+size] = self.target
                 h += hgap + size
-                cv2.imshow(window, screen)
-                if cv2.waitKey(2500) & 0xFF == ord('n'):
+                self.pipe.send(screen)
+                if self.pipe.poll(2.5):
+                    msg = self.pipe.recv()
+                    print('veio:', msg)
                     continue
             v += vgap + size
         

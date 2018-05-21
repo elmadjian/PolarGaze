@@ -62,8 +62,8 @@ class Calibrator():
 class Calibrator_3D():
 
     def __init__(self):#TODO: add binocular as an option
-        self.leyeball = np.array((-0.12, -0.08, -0.05), float)
-        self.reyeball = np.array((-0.02, -0.08, -0.05), float)
+        self.leyeball = np.array((-0.12, 0.08, -0.05), float)
+        self.reyeball = np.array((-0.02, 0.08, -0.05), float)
         self.radius = 0.024 #antropomorphic average
         self.calib_point = np.array((0,0,0), float)
         self.targets = np.empty((0,3), float)
@@ -86,7 +86,7 @@ class Calibrator_3D():
             self.r_centers = np.vstack((self.r_centers, reye))
 
 
-    def build_model(self):
+    def estimate_gaze(self):
         lb, lc = self.leyeball, self.l_centers
         rb, rc = self.reyeball, self.r_centers
         self.lmodel = self.__build_model_one_eye(lb, lc)
@@ -99,12 +99,13 @@ class Calibrator_3D():
                                        optimizer=None,
                                        n_restarts_optimizer=9,
                                        kernel = kernel)
-        surface = np.empty((0,0,0), float)                                       
+        surface = np.empty((0,3), float)                                       
         for t in self.targets:
             t = t - eyeball
-            t_norm = tl/np.linalg.norm(t)
+            t_norm = t/np.linalg.norm(t)
             s = t_norm * self.radius
             surface = np.vstack((surface, s))
+        print('centers length:', len(centers), "surface length:", len(surface))
         clf.fit(centers, surface)
         return clf
 

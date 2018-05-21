@@ -5,12 +5,12 @@ from threading import Thread
 
 class View(Thread):
 
-    def __init__(self, controller, cv):
+    def __init__(self, controller, pipe):
         Thread.__init__(self)
         self.calibration = False
         self.active = False
         self.controller = controller
-        self.cv = cv
+        self.pipe = pipe
 
 
     def run(self):
@@ -54,8 +54,7 @@ class View(Thread):
 
                     if event.code == 49 and event.value == 1: #'n'
                         #print('next target...')
-                        with self.cv:
-                            self.cv.notify_all()
+                        self.pipe.send('next')
 
                     if event.code in calibrations and event.value == 1: #'0-9'
                         '''

@@ -13,10 +13,9 @@ import calib_screen
 import realsense
 import threading
 import scene
+import visualizer_3d
 from matplotlib import pyplot as plt
-
-import vispy.scene
-from vispy.scene import visuals
+from multiprocessing import Process, Pipe
 
 
 class Controller():
@@ -39,7 +38,7 @@ class Controller():
         self.marker = cv2.imread('marker2.png', cv2.IMREAD_GRAYSCALE)
         self.screen = None
         self.in3d = in3d
-        self.cv = threading.Condition()
+        self.pipe_father, self.pipe_child = Pipe()
 
 
     def __setup_video_input(self, argv):
@@ -73,18 +72,23 @@ class Controller():
     def calibrate(self, id):
         self.calibrating = id
         if self.in3d:
-            calib = calibrator.Calibrator(binocular=True, in3d=True)
+            calib = None
+            if self.in3d == 'gpr':
+                calib = calibrator.Calibrator(binocular=True, in3d=True)
+            elif self.in3d == 'realsense':
+                calib = calibrator.Calibrator_3D()
             self.calibrations[id][0] = calib
-            self.screen = calib_screen.CalibrationScreen(1280,720,3,4,
-                                            self.marker, self.cv, True)
+            self.screen = Process(target=calib_screen.CalibrationScreen,
+                    args=(1280,720,3,4,self.marker, self.pipe_child, True,))
         else:
             calib_left  = calibrator.Calibrator(binocular=False)
             calib_right = calibrator.Calibrator(binocular=False) 
             self.calibrations[id][0] = calib_left
             self.calibrations[id][1] = calib_right
-            self.screen = calib_screen.CalibrationScreen(1920,1080,3,4,
-                                            self.marker, self.cv)
+            self.screen = Process(target=calib_screen.CalibrationScreen,
+                        args=(1920,1080,3,4,self.marker, self.pipe_child,))
         self.screen.start()
+        cv2.namedWindow('calibration')
 
 
     def end_calibration(self):
@@ -94,6 +98,7 @@ class Controller():
             self.calibrations[id][1].estimate_gaze()
         self.calibrating = False
         self.screen.join()
+        cv2.destroyWindow('calibration')
 
     
     def use_calibration(self, id):
@@ -108,8 +113,9 @@ class Controller():
 
     def __collect_data(self, target, leye, reye):
         id = self.calibrating
-        if target is not None and leye is not None and reye is not None:
+        if target is not None and leye is not None and reye is not None and id:
             if self.in3d:
+                #print('collecting:', target, leye, reye)
                 self.calibrations[id][0].collect_data(target, leye, reye)
             else:
                 self.calibrations[id][0].collect_data(target, leye)
@@ -125,7 +131,7 @@ class Controller():
 
     def run_2d(self):
         scn = scene.SceneCamera(self.sc_video, 1280, 720) 
-        kbd = view.View(self, self.cv)
+        kbd = view.View(self, self.pipe_father)
         scn.start()
         kbd.start()
         while True:
@@ -137,6 +143,8 @@ class Controller():
                 if self.calibrating:
                     target = scn.get_marker_position()
                     self.__collect_data(target, le_c, re_c)
+                    if self.pipe_father.poll():
+                        cv2.imshow('calibration', self.pipe_father.recv())
                 elif self.active:
                     id = self.active
                     lcoord = self.calibrations[id][0].predict(le_c,w=1280,h=720)
@@ -155,10 +163,16 @@ class Controller():
 
     def run_3d(self):
         scn = realsense.RealSense(640, 480)
-        kbd = view.View(self, self.cv)
+        kbd = view.View(self, self.pipe_father)
+        planes = [0.75, 1.35, 2.0]
+        left  = np.array((-0.12, 0.08, -0.05), float)
+        right = np.array((-0.02, 0.08, -0.05), float)
+        p_father, p_child = Pipe()
+        proc = Process(target=visualizer_3d.Visualizer, 
+                    args=(planes, left, right, p_child,))
+        proc.start()
         scn.start()
         kbd.start()
-        points = np.empty((0,3), float)
         while True:
             if scn.color_frame is not None:
                 cv2.imshow('left', self.left_e.get_frame('l'))
@@ -168,37 +182,37 @@ class Controller():
                 if self.calibrating:
                     scn.set_marker_position()
                     target = scn.coord3D
-                    if target is not None:
-                        points = np.vstack((points, target))
                     self.__collect_data(target, le_c, re_c)
+                    if self.pipe_father.poll():
+                        cv2.imshow("calibration", self.pipe_father.recv())
                 elif self.active:
-                    coord = self.calibrations[self.active][0].predict(le_c, re_c)
-                    if coord is not None:
-                        print(coord)
+                    if self.in3d == 'gpr':
+                        coord = self.calibrations[self.active][0].predict(le_c, re_c)
+                        if coord is not None:
+                            vis.update(coord, coord)
+                    elif self.in3d == 'realsense':
+                        lc,rc = self.calibrations[self.active][0].get_gaze_vector(le_c, re_c)
+                        p_father.send([lc, rc])
                 cv2.imshow('scene', scn.color_frame)
             if cv2.waitKey(5) & 0xFF == ord('q'):
                 scn.quit = True
                 break
         kbd.join()
         scn.join()
+        proc.terminate()
         cv2.destroyAllWindows()
-
-        # canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
-        # myview = canvas.central_widget.add_view()
-        # scatter = visuals.Markers()
-        # scatter.set_data(points, edge_color=None, face_color=(1,1,1,.5),size=5)
-        # myview.add(scatter)
-        # myview.camera = 'turntable'
-
-        # axis = visuals.XYZAxis(parent=myview.scene)
-        # vispy.app.run()
 
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 #====================================================================
 if __name__=="__main__":
     if sys.argv[-1] == '--3d':
-        controller = Controller(sys.argv, True)
+        controller = Controller(sys.argv, 'gpr')
+    elif sys.argv[-1] == '--rs':
+        controller = Controller(sys.argv, 'realsense')
+        left = np.array((-0.12, 0.08, -0.05), float)
+        right = np.array((-0.02, 0.08, -0.05), float)
+        #vis = visualizer_3d.Visualizer([0.75, 1.35, 2.0], left, right)
     else:
         controller = Controller(sys.argv)
     controller.run()

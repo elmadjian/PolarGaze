@@ -61,15 +61,15 @@ class RealSense(Thread):
         y = position[0]
         est_depth = depth[x,y]
         pos = np.array([y,x], np.float32)
-        if est_depth > 0:
-            return dev.deproject_pixel_to_point(pos, est_depth)
+        if est_depth > 0.6:
+            return dev.deproject_pixel_to_point(pos, est_depth)/1000.0
                        
 
 
 
 
 if __name__=="__main__":
-    rs = RealSense()
+    rs = RealSense(640,480)
     rs.run()
 
     
