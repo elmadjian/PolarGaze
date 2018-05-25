@@ -14,6 +14,7 @@ import realsense
 import threading
 import scene
 import visualizer_3d
+import re
 from multiprocessing import Process, Pipe
 
 
