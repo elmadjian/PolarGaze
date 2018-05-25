@@ -19,6 +19,7 @@ class View(Thread):
         's' KEY is used to toggle pupil action area mapping
         'r' KEY resets the pupil action model
         'c' KEY is used to trigger calibration procedure
+        'n' KEY is used to make calibration targets move to the next position
         'q' KEY is used to quit
         'SHIFT + [1-9]' selects a calibration
         'SHIFT + 0' disables calibration 
@@ -53,7 +54,6 @@ class View(Thread):
                         self.controller.reset_model()
 
                     if event.code == 49 and event.value == 1: #'n'
-                        #print('next target...')
                         self.pipe.send('next')
 
                     if event.code in calibrations and event.value == 1: #'0-9'

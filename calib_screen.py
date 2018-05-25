@@ -15,7 +15,6 @@ class CalibrationScreen():
         self.border = 24
         self.pipe = pipe
         self.in3d = in3d
-        #print('fui criado')
         self.run()
 
     
@@ -43,7 +42,6 @@ class CalibrationScreen():
                 self.pipe.send(screen)
                 if self.pipe.poll(2.5):
                     msg = self.pipe.recv()
-                    print('veio:', msg)
                     continue
             v += vgap + size
         

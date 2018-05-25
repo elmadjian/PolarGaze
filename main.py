@@ -14,7 +14,6 @@ import realsense
 import threading
 import scene
 import visualizer_3d
-from matplotlib import pyplot as plt
 from multiprocessing import Process, Pipe
 
 
@@ -212,7 +211,6 @@ if __name__=="__main__":
         controller = Controller(sys.argv, 'realsense')
         left = np.array((-0.12, 0.08, -0.05), float)
         right = np.array((-0.02, 0.08, -0.05), float)
-        #vis = visualizer_3d.Visualizer([0.75, 1.35, 2.0], left, right)
     else:
         controller = Controller(sys.argv)
     controller.run()
