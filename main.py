@@ -14,6 +14,7 @@ import realsense
 import threading
 import scene
 import visualizer_3d
+import videoio
 import re
 from multiprocessing import Process, Pipe
 
@@ -42,15 +43,19 @@ class Controller():
 
 
     def __setup_video_input(self, argv):
-        if len(argv) > 1:
-            self.le_video = int(argv[1])
-            self.re_video = int(argv[2])
-            if len(argv) > 3:
-                self.sc_video = int(argv[3])
-        else:
+        if "--cam" in argv and len(argv) < 5:
+            vid = videoio.VideoIO()
+            self.le_video = vid.get_eye_id("left")
+            self.re_video = vid.get_eye_id("right")
+            self.sc_video = vid.get_rs_id()
+        elif "--vid" in argv and len(argv) < 5:
             self.le_video = 'videos/left003.avi'
             self.re_video = 'videos/right003.avi'
             self.sc_video = 'videos/scene003.avi'
+        else:
+            self.le_video = int(argv[2])
+            self.re_video = int(argv[3])
+            self.sc_video = int(argv[4])
 
 
     def build_model(self):
@@ -206,12 +211,25 @@ class Controller():
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 #====================================================================
 if __name__=="__main__":
-    if sys.argv[-1] == '--3d':
+    if '--h' in sys.argv or len(sys.argv) < 2:
+        print("usage: <program> <input> [i-params] [model] [m-params]\n\n"
+            + "INPUTS:\n"
+            + "--cam: Connected video input devices\n"
+            + "--vid: Load saved video files\n\n"
+            + "MODELS (mandatory for 3D):\n"
+            + "--gpr: Gaussian Processes Regressor for 3D\n"
+            + "--rs:  RealSense camea backend and 3D gaze vector\n\n"
+            + "PARAMS (optional):\n"
+            + "--cam 1 2 3: Left eye camera is loaded from /dev/video1,\n"
+            + "             right from /dev/video2, and\n"
+            + "             scene from /dev/video3\n"
+            + "--vid f1 f2 f3: load video files for left and right \n"
+            + "                eyes and scene camera\n")
+        sys.exit()
+    elif '--gpr' in sys.argv:
         controller = Controller(sys.argv, 'gpr')
-    elif sys.argv[-1] == '--rs':
+    elif '--rs' in sys.argv:
         controller = Controller(sys.argv, 'realsense')
-        left = np.array((-0.12, 0.08, -0.05), float)
-        right = np.array((-0.02, 0.08, -0.05), float)
     else:
         controller = Controller(sys.argv)
     controller.run()
