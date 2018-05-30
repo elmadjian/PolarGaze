@@ -32,7 +32,7 @@ class VideoIO():
     def get_rs_id(self):
         if self.rs_id is not None:
             return self.rs_id
-        print("Could not find RealSense camera")
+        print("Could not find RealSense camera (yet)")
 
     
     def get_eye_id(self, side):

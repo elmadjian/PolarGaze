@@ -33,13 +33,13 @@ class Controller():
         self.d_estimator  = depth.DepthEstimator()
         self.calibrations = {i:[None,None] for i in range(1,10)}
         self.calibrating  = False
-        self.active   = False
+        self.active  = False
         self.__setup_video_input(argv)
-        self.left_e   = eye.Eye(self.le_track, self.polar_le, self.le_video)
-        self.right_e  = eye.Eye(self.re_track, self.polar_re, self.re_video)
-        self.marker = cv2.imread('marker2.png', cv2.IMREAD_GRAYSCALE)
-        self.screen = None
-        self.in3d = in3d
+        self.left_e  = eye.Eye(self.le_track, self.polar_le, self.le_video)
+        self.right_e = eye.Eye(self.re_track, self.polar_re, self.re_video)
+        self.marker  = cv2.imread('marker2.png', cv2.IMREAD_GRAYSCALE)
+        self.screen  = None
+        self.in3d    = in3d
         self.pipe_father, self.pipe_child = Pipe()
 
 
@@ -49,6 +49,7 @@ class Controller():
             self.le_video = vid.get_eye_id("left")
             self.re_video = vid.get_eye_id("right")
             self.sc_video = vid.get_rs_id()
+            #print(self.le_video, self.re_video, self.sc_video)
         elif "--vid" in argv and len(argv) < 5:
             self.le_video = 'videos/left003.avi'
             self.re_video = 'videos/right003.avi'
@@ -128,21 +129,21 @@ class Controller():
                 self.calibrations[id][1].collect_data(target, reye)
 
 
-    def run(self, publish):
+    def run(self, publish, ip=""):
         if self.in3d:
-            self.run_3d(publish)
+            self.run_3d(publish, ip)
         else:
-            self.run_2d(publish)
+            self.run_2d(publish, ip)
 
 
-    def run_2d(self, publish):
+    def run_2d(self, publish, ip=""):
         scn = scene.SceneCamera(self.sc_video, 1280, 720) 
         kbd = view.View(self, self.pipe_father)
         scn.start()
         kbd.start()
         net = network.Network()
         if publish:
-            net.create_connection()
+            net.create_connection(ip)
         while True:
             if scn.frame is not None:
                 cv2.imshow('left', self.left_e.get_frame('l'))
@@ -167,10 +168,11 @@ class Controller():
                 break
         kbd.join()
         scn.join()
+        net.close()
         cv2.destroyAllWindows()
 
 
-    def run_3d(self, publish):
+    def run_3d(self, publish, ip=""):
         scn = realsense.RealSense(640, 480)
         kbd = view.View(self, self.pipe_father)
         planes = [0.75, 1.35, 2.0]
@@ -178,7 +180,7 @@ class Controller():
         right = np.array((-0.02, 0.08, -0.05), float)
         net = network.Network()
         if publish:
-            net.create_connection()
+            net.create_connection(ip)
         p_father, p_child = Pipe()
         proc = Process(target=visualizer_3d.Visualizer, 
                     args=(planes, left, right, p_child,))
@@ -191,6 +193,9 @@ class Controller():
                 cv2.imshow('right', self.right_e.get_frame('r'))
                 le_c = self.left_e.centroid
                 re_c = self.right_e.centroid
+                if publish:
+                    if le_c is not None and re_c is not None:
+                        net.publish_vector("gaze", le_c, re_c)
                 if self.calibrating:
                     scn.set_marker_position()
                     target = scn.coord3D
@@ -208,12 +213,13 @@ class Controller():
                         net.publish_vector("gaze", lc, rc)
                         p_father.send([lc, rc])
                 cv2.imshow('scene', scn.color_frame)
-            if cv2.waitKey(5) & 0xFF == ord('q'):
+            if cv2.waitKey(6) & 0xFF == ord('q'):
                 scn.quit = True
                 break
         kbd.join()
         scn.join()
         proc.terminate()
+        net.close()
         cv2.destroyAllWindows()
 
 
@@ -227,14 +233,15 @@ if __name__=="__main__":
             + "--vid: Load saved video files\n\n"
             + "OPTIONS ('gpr' or 'rs' are mandatory for 3D):\n"
             + "--gpr: Gaussian Processes Regressor for 3D\n"
-            + "--rs:  RealSense camea backend and 3D gaze vector\n
+            + "--rs:  RealSense camera backend and 3D gaze vector\n"
             + "--pub: Publish gaze estimation data\n\n"
             + "PARAMS (optional):\n"
             + "--cam 1 2 3: Left eye camera is loaded from /dev/video1,\n"
             + "             right from /dev/video2, and\n"
             + "             scene from /dev/video3\n"
             + "--vid f1 f2 f3: load video files for left and right \n"
-            + "                eyes and scene camera\n")
+            + "                eyes and scene camera\n"
+            + "--pub 1.1.1.1: send data to a specific address\n")
         sys.exit()
     elif '--gpr' in sys.argv:
         controller = Controller(sys.argv, 'gpr')
@@ -243,10 +250,11 @@ if __name__=="__main__":
     else:
         controller = Controller(sys.argv)
 
-    pub = False
+    pub, ip = False, ""
     if '--pub' in sys.argv:
         pub = True
-    controller.run(pub)
+        ip  = re.findall("\\d+.\\d+.\\d+.\\d+", sys.argv) 
+    controller.run(pub, ip)
 
 
 
