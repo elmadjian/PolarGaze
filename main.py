@@ -16,6 +16,7 @@ import scene
 import visualizer_3d
 import videoio
 import re
+import network
 from multiprocessing import Process, Pipe
 
 
@@ -84,7 +85,7 @@ class Controller():
                 calib = calibrator.Calibrator_3D()
             self.calibrations[id][0] = calib
             self.screen = Process(target=calib_screen.CalibrationScreen,
-                    args=(1280,720,3,4,self.marker, self.pipe_child, True,))
+                    args=(1280,720,3,4,self.marker, self.pipe_child, 2,))
         else:
             calib_left  = calibrator.Calibrator(binocular=False)
             calib_right = calibrator.Calibrator(binocular=False) 
@@ -127,18 +128,21 @@ class Controller():
                 self.calibrations[id][1].collect_data(target, reye)
 
 
-    def run(self):
+    def run(self, publish):
         if self.in3d:
-            self.run_3d()
+            self.run_3d(publish)
         else:
-            self.run_2d()
+            self.run_2d(publish)
 
 
-    def run_2d(self):
+    def run_2d(self, publish):
         scn = scene.SceneCamera(self.sc_video, 1280, 720) 
         kbd = view.View(self, self.pipe_father)
         scn.start()
         kbd.start()
+        net = network.Network()
+        if publish:
+            net.create_connection()
         while True:
             if scn.frame is not None:
                 cv2.imshow('left', self.left_e.get_frame('l'))
@@ -166,12 +170,15 @@ class Controller():
         cv2.destroyAllWindows()
 
 
-    def run_3d(self):
+    def run_3d(self, publish):
         scn = realsense.RealSense(640, 480)
         kbd = view.View(self, self.pipe_father)
         planes = [0.75, 1.35, 2.0]
         left  = np.array((-0.12, 0.08, -0.05), float)
         right = np.array((-0.02, 0.08, -0.05), float)
+        net = network.Network()
+        if publish:
+            net.create_connection()
         p_father, p_child = Pipe()
         proc = Process(target=visualizer_3d.Visualizer, 
                     args=(planes, left, right, p_child,))
@@ -194,9 +201,11 @@ class Controller():
                     if self.in3d == 'gpr':
                         coord = self.calibrations[self.active][0].predict(le_c, re_c)
                         if coord is not None:
-                            vis.update(coord, coord)
+                            net.publish_coord("gaze", coord)
+                            p_father.send([coord, coord])
                     elif self.in3d == 'realsense':
                         lc,rc = self.calibrations[self.active][0].get_gaze_vector(le_c, re_c)
+                        net.publish_vector("gaze", lc, rc)
                         p_father.send([lc, rc])
                 cv2.imshow('scene', scn.color_frame)
             if cv2.waitKey(5) & 0xFF == ord('q'):
@@ -212,13 +221,14 @@ class Controller():
 #====================================================================
 if __name__=="__main__":
     if '--h' in sys.argv or len(sys.argv) < 2:
-        print("usage: <program> <input> [i-params] [model] [m-params]\n\n"
+        print("usage: <program> <input> [i-params] [options] [o-params]\n\n"
             + "INPUTS:\n"
             + "--cam: Connected video input devices\n"
             + "--vid: Load saved video files\n\n"
-            + "MODELS (mandatory for 3D):\n"
+            + "OPTIONS ('gpr' or 'rs' are mandatory for 3D):\n"
             + "--gpr: Gaussian Processes Regressor for 3D\n"
-            + "--rs:  RealSense camea backend and 3D gaze vector\n\n"
+            + "--rs:  RealSense camea backend and 3D gaze vector\n
+            + "--pub: Publish gaze estimation data\n\n"
             + "PARAMS (optional):\n"
             + "--cam 1 2 3: Left eye camera is loaded from /dev/video1,\n"
             + "             right from /dev/video2, and\n"
@@ -232,7 +242,11 @@ if __name__=="__main__":
         controller = Controller(sys.argv, 'realsense')
     else:
         controller = Controller(sys.argv)
-    controller.run()
+
+    pub = False
+    if '--pub' in sys.argv:
+        pub = True
+    controller.run(pub)
 
 
 

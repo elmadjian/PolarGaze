@@ -6,7 +6,7 @@ from threading import Thread
 
 class CalibrationScreen():
 
-    def __init__(self, width, height, lines, columns, img, pipe, in3d=False):
+    def __init__(self, width, height, lines, columns, img, pipe, planes=1):
         self.w = width
         self.h = height
         self.L = lines
@@ -14,7 +14,7 @@ class CalibrationScreen():
         self.target = img
         self.border = 24
         self.pipe = pipe
-        self.in3d = in3d
+        self.planes = planes
         self.run()
 
     
@@ -23,9 +23,8 @@ class CalibrationScreen():
         self.target = cv2.resize(self.target, (size,size))
         hgap = ((self.w - self.border)-(4*size))//5
         vgap = ((self.h - self.border)-(3*size))//5
-        self.__cycle(hgap, vgap, size)
-        if self.in3d:
-           self.__cycle(hgap, vgap, size)
+        for p in range(len(self.planes)):
+            self.__cycle(hgap, vgap, size)
 
 
     def __cycle(self, hgap, vgap, size):

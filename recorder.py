@@ -25,11 +25,9 @@ def record():
         ret2, frame2 = cam2.read()
         ret3, frame3 = cam3.read()
         if ret1:
-            frame1 = cv2.flip(frame1, 0)
             cv2.imshow('left', frame1)
             le_out.write(frame1)
         if ret2:
-            frame2 = cv2.flip(frame2, 1)
             cv2.imshow('right', frame2)
             re_out.write(frame2)
         if ret3:
