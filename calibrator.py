@@ -64,7 +64,7 @@ class Calibrator_3D():
     def __init__(self):#TODO: add binocular as an option
         self.leyeball = np.array((-0.12, 0.08, -0.05), float)
         self.reyeball = np.array((-0.02, 0.08, -0.05), float)
-        self.radius = 0.024 #antropomorphic average
+        self.radius = 0.01225 #antropomorphic average
         self.calib_point = np.array((0,0,0), float)
         self.targets = np.empty((0,3), float)
         self.l_centers = np.empty((0,2), float)

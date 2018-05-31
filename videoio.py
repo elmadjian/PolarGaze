@@ -19,13 +19,13 @@ class VideoIO():
         out = binout.decode().split('\n')
         for i in range(len(out)):
             if re.findall('Integrated Camera', out[i]):
-                eye_id = re.findall("video(\\d+)", out[i+1])
+                eye_id = re.findall("video(\d+)", out[i+1])
                 if self.eye_id_1 is None:
                     self.eye_id_1 = int(eye_id[0])
                 else:
                     self.eye_id_2 = int(eye_id[0])
             if re.findall('RealSense', out[i]):
-                rs_id = re.findall("video(\\d+)", out[i+3])
+                rs_id = re.findall("video(\d+)", out[i+3])
                 self._rs_id = int(rs_id[0])
 
 
